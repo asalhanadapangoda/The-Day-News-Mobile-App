@@ -99,7 +99,7 @@ export default function TransactionsScreen() {
               <Ionicons name="receipt-outline" size={38} color={colors.muted} />
             </View>
             <Text style={s.emptyTitle}>No transactions</Text>
-            <Text style={s.emptyDesc}>You haven't recorded any expenses or income for {prettyMonth}.</Text>
+            <Text style={s.emptyDesc}>You haven&apos;t recorded any expenses or income for {prettyMonth}.</Text>
           </View>
         ) : (
           sortedDates.map((date) => (

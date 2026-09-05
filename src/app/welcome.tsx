@@ -53,7 +53,7 @@ export default function WelcomeScreen() {
       } else {
         await Linking.openURL(OFFICIAL_WEBSITE_URL);
       }
-    } catch (e) {
+    } catch {
       await Linking.openURL(OFFICIAL_WEBSITE_URL);
     }
   };
@@ -84,7 +84,7 @@ export default function WelcomeScreen() {
     await setGlobalCurrency(finalCurrency);
 
     const openingBalance = Number(balance);
-    if (accountName.trim() && !Number.isNaN(openingBalance)) {
+    if (accountName.trim() && Number.isFinite(openingBalance) && Math.abs(openingBalance) <= 999999999.99) {
       await saveAccount({
         name: accountName.trim(),
         type: 'cash',
@@ -196,7 +196,7 @@ export default function WelcomeScreen() {
             <View style={s.iconWrapper}>
               <Ionicons name="person-outline" size={40} color={colors.primary} />
             </View>
-            <Text style={s.title}>What's Your Name?</Text>
+            <Text style={s.title}>What&apos;s Your Name?</Text>
             <Text style={s.subtitle}>Personalize your dashboard experience.</Text>
 
             <View style={s.form}>
@@ -205,6 +205,7 @@ export default function WelcomeScreen() {
                 style={s.input}
                 value={userName}
                 onChangeText={setUserName}
+                maxLength={40}
                 placeholder="e.g., Alex"
                 placeholderTextColor="#8190A8"
               />
@@ -299,6 +300,7 @@ export default function WelcomeScreen() {
                 style={s.input}
                 value={accountName}
                 onChangeText={setAccountName}
+                maxLength={50}
                 placeholder="e.g., Main Wallet / Cash"
                 placeholderTextColor="#8190A8"
               />
@@ -308,6 +310,7 @@ export default function WelcomeScreen() {
                 style={s.input}
                 value={balance}
                 onChangeText={setBalance}
+                maxLength={12}
                 placeholder="0.00"
                 keyboardType="decimal-pad"
                 placeholderTextColor="#8190A8"

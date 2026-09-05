@@ -1,22 +1,31 @@
 {
   "expo": {
-    "name": "MyMobileApp",
-    "slug": "MyMobileApp",
+    "name": "The Day App",
+    "slug": "the-day-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mymobileapp",
+    "scheme": "thedayapp",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.thedaynews.thedayapp",
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "The Day App uses Face ID to securely authenticate and protect your financial records.",
+        "NSCameraUsageDescription": "The Day App uses your camera to capture receipts for transaction tracking.",
+        "NSPhotoLibraryUsageDescription": "The Day App accesses your photo library to allow you to attach receipts to transactions."
+      }
     },
     "android": {
+      "package": "com.thedaynews.thedayapp",
+      "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#0A1B3B",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
+      "allowBackup": false,
       "predictiveBackGestureEnabled": false
     },
     "web": {
@@ -36,13 +45,17 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#101726",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "imageWidth": 150
         }
       ],
       "expo-sqlite",
-      "expo-sharing"
+      "expo-sharing",
+      "expo-secure-store",
+      "expo-local-authentication",
+      "expo-image-picker",
+      "expo-document-picker"
     ],
     "experiments": {
       "typedRoutes": true,

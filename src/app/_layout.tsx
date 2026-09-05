@@ -7,8 +7,41 @@ import { migrateDbIfNeeded } from '@/data/database';
 import { MoneyProvider, useMoney } from '@/context/money-context';
 import { colors } from '@/components/ui';
 
+import { SecurityProvider, useSecurity } from '@/context/security-context';
+import { LockScreen } from '@/components/security/lock-screen';
+
 export default function RootLayout() {
-  return <SQLiteProvider databaseName="lumina-finance.db" onInit={migrateDbIfNeeded}><MoneyProvider><StatusBar style="light" /><AppNavigator /></MoneyProvider></SQLiteProvider>;
+  return (
+    <SecurityProvider>
+      <StatusBar style="light" />
+      <AppSecurityGate />
+    </SecurityProvider>
+  );
+}
+
+function AppSecurityGate() {
+  const { authState, privacyShieldActive } = useSecurity();
+
+  if (authState === 'INITIALIZING') {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (authState === 'LOCKED' || authState === 'AUTHENTICATING') {
+    return <LockScreen />;
+  }
+
+  return (
+    <SQLiteProvider databaseName="lumina-finance.db" onInit={migrateDbIfNeeded}>
+      <MoneyProvider>
+        <AppNavigator />
+        {privacyShieldActive ? <LockScreen /> : null}
+      </MoneyProvider>
+    </SQLiteProvider>
+  );
 }
 
 function AppNavigator() { 

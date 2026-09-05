@@ -76,6 +76,7 @@ export default function AccountForm() {
         <TextInput
           value={name}
           onChangeText={setName}
+          maxLength={50}
           placeholder="e.g., Main Savings Account"
           placeholderTextColor="#8190A8"
           style={s.input}
@@ -105,6 +106,7 @@ export default function AccountForm() {
           value={balance}
           onChangeText={setBalance}
           keyboardType="decimal-pad"
+          maxLength={12}
           placeholder="0.00"
           placeholderTextColor="#8190A8"
           style={s.input}

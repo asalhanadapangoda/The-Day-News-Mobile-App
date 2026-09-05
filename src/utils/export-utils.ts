@@ -1,7 +1,10 @@
-import { documentDirectory, writeAsStringAsync, EncodingType } from 'expo-file-system/legacy';
+import { cacheDirectory, documentDirectory, writeAsStringAsync, deleteAsync, EncodingType } from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
 import { Platform } from 'react-native';
+// @ts-ignore
+import { jsPDF } from 'jspdf/dist/jspdf.es.min.js';
+import autoTable from 'jspdf-autotable';
 import { Transaction, Category, Account } from '@/data/types';
 import { formatMoney } from '@/components/ui';
 
@@ -14,11 +17,36 @@ function escapeHtml(text: string): string {
     .replace(/'/g, '&#039;');
 }
 
-function sanitizeCsvField(field: string): string {
-  if (!field) return '""';
-  let val = String(field).replace(/"/g, '""');
-  // Neutralize CSV formula execution (=, +, -, @, \t, \r)
-  if (/^[=+@\t\r-]/.test(val)) {
+/**
+ * Serializes an application-validated numeric value as an unquoted, formula-safe numeric CSV literal.
+ * Ensures the value is finite and formatted to two decimal places.
+ * Example: -32.20, 1500.00, 0.00
+ */
+export function formatCsvNumeric(value: number, isNegative: boolean = false): string {
+  if (!Number.isFinite(value)) {
+    return '0.00';
+  }
+  const magnitude = Math.abs(value);
+  const formatted = magnitude.toFixed(2);
+  return isNegative && magnitude > 0 ? `-${formatted}` : formatted;
+}
+
+/**
+ * Serializes a user-controlled text field safely for CSV.
+ * Escapes double quotes and neutralizes spreadsheet formula execution prefixes
+ * (=, +, -, @, \t, \r, \n) by prepending an apostrophe.
+ * Example: "- Keells Super" -> '"\'- Keells Super"'
+ */
+export function formatCsvText(text: string | null | undefined): string {
+  if (text === null || text === undefined) return '""';
+  let val = String(text);
+  if (!val) return '""';
+
+  // Escape double quotes
+  val = val.replace(/"/g, '""');
+
+  // Neutralize CSV formula execution prefixes
+  if (/^[=+@\t\r\n-]/.test(val)) {
     val = "'" + val;
   }
   return `"${val}"`;
@@ -36,9 +64,10 @@ export async function exportToCSV(
     transactions.forEach(t => {
       const category = categories.find(c => c.id === t.categoryId)?.name || '';
       const account = accounts.find(a => a.id === t.accountId)?.name || '';
-      const amountStr = t.type === 'expense' ? `-${t.amount}` : `${t.amount}`;
-      const note = t.note || '';
-      csvString += `${sanitizeCsvField(t.date)},${sanitizeCsvField(t.type)},${sanitizeCsvField(category)},${sanitizeCsvField(account)},${sanitizeCsvField(amountStr)},${sanitizeCsvField(note)}\n`;
+      const isExpense = t.type === 'expense';
+      const formattedAmount = formatCsvNumeric(t.amount, isExpense);
+
+      csvString += `${formatCsvText(t.date)},${formatCsvText(t.type)},${formatCsvText(category)},${formatCsvText(account)},${formattedAmount},${formatCsvText(t.note)}\n`;
     });
 
     if (Platform.OS === 'web') {
@@ -46,32 +75,39 @@ export async function exportToCSV(
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `lumina-export-${Date.now()}.csv`;
+      a.download = `thedayapp-export-${Date.now()}.csv`;
       a.click();
+      setTimeout(() => window.URL.revokeObjectURL(url), 1000);
       return true;
     }
 
-    const fileUri = documentDirectory + `lumina-export-${Date.now()}.csv`;
+    const baseDir = cacheDirectory || documentDirectory || '';
+    const fileUri = `${baseDir}thedayapp-export-${Date.now()}.csv`;
     await writeAsStringAsync(fileUri, csvString, { encoding: EncodingType.UTF8 });
     
-    const canShare = await Sharing.isAvailableAsync();
-    if (canShare) {
-      await Sharing.shareAsync(fileUri, {
-        mimeType: 'text/csv',
-        dialogTitle: 'Export Transactions CSV'
-      });
-      return true;
+    try {
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(fileUri, {
+          mimeType: 'text/csv',
+          dialogTitle: 'Export Transactions CSV'
+        });
+        return true;
+      }
+      return false;
+    } finally {
+      // Clean up temporary export file to prevent unencrypted persistent file buildup
+      try {
+        await deleteAsync(fileUri, { idempotent: true });
+      } catch {
+        // Tolerated
+      }
     }
-    return false;
   } catch (error) {
     console.error(error);
     return false;
   }
 }
-
-// @ts-ignore
-import { jsPDF } from 'jspdf/dist/jspdf.es.min.js';
-import autoTable from 'jspdf-autotable';
 
 export async function exportToPDF(
   transactions: Transaction[],
@@ -81,7 +117,7 @@ export async function exportToPDF(
   try {
     if (Platform.OS === 'web') {
       const doc = new jsPDF();
-      doc.text("Lumina Finance Report", 14, 15);
+      doc.text("The Day App Report", 14, 15);
       doc.setFontSize(10);
       doc.text(`Generated on ${new Date().toLocaleDateString()}`, 14, 22);
       
@@ -110,7 +146,7 @@ export async function exportToPDF(
         }
       });
 
-      doc.save(`lumina-report-${Date.now()}.pdf`);
+      doc.save(`thedayapp-report-${Date.now()}.pdf`);
       return true;
     }
 
@@ -146,7 +182,7 @@ export async function exportToPDF(
           </style>
         </head>
         <body>
-          <h1>Lumina Finance Report</h1>
+          <h1>The Day App Report</h1>
           <p>Generated on ${escapeHtml(new Date().toLocaleDateString())}</p>
           <table>
             <thead>
@@ -167,16 +203,25 @@ export async function exportToPDF(
 
     const { uri } = await Print.printToFileAsync({ html });
     
-    const canShare = await Sharing.isAvailableAsync();
-    if (canShare) {
-      await Sharing.shareAsync(uri, {
-        UTI: '.pdf',
-        mimeType: 'application/pdf',
-        dialogTitle: 'Export Transactions PDF'
-      });
-      return true;
+    try {
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(uri, {
+          UTI: '.pdf',
+          mimeType: 'application/pdf',
+          dialogTitle: 'Export Transactions PDF'
+        });
+        return true;
+      }
+      return false;
+    } finally {
+      // Clean up temporary printed PDF to prevent storage accumulation
+      try {
+        await deleteAsync(uri, { idempotent: true });
+      } catch {
+        // Tolerated
+      }
     }
-    return false;
   } catch (err) {
     console.error(err);
     return false;
