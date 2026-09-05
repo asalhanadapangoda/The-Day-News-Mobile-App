@@ -4,7 +4,7 @@ import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, Vi
 import { Ionicons } from '@expo/vector-icons';
 import { useMoney } from '@/context/money-context';
 import type { CategoryInput } from '@/context/money-context';
-import { colors, Screen, AppHeader, CategoryIcon } from '@/components/ui';
+import { colors, Screen, AppHeader } from '@/components/ui';
 
 const palette = ['#8B6BE8', '#22C6A3', '#78A4F9', '#F27496', '#2CB7BD', '#E3B525'];
 const selectableIcons = [
@@ -85,6 +85,7 @@ export default function CategoryForm() {
         <TextInput
           value={name}
           onChangeText={setName}
+          maxLength={40}
           placeholder="e.g., Health & Fitness"
           placeholderTextColor="#8190A8"
           style={s.input}

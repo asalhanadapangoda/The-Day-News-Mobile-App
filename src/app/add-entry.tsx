@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { type ReactNode, useEffect, useState, createElement } from 'react';
+import { type ReactNode, useState, createElement } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,6 +7,12 @@ import * as ImagePicker from 'expo-image-picker';
 import { useMoney } from '@/context/money-context';
 import type { EntryType } from '@/data/types';
 import { colors, Screen, AppHeader, CategoryIcon } from '@/components/ui';
+import {
+  persistReceipt,
+  useReceiptDisplayUri,
+  MAX_RECEIPT_SIZE_BYTES,
+  type StagedReceipt,
+} from '@/utils/receipt-storage';
 
 export default function AddEntryScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>(); const { accounts, categories, transactions, saveTransaction, deleteTransaction, currency } = useMoney(); const existing = transactions.find((transaction) => transaction.id === id);
@@ -14,42 +20,71 @@ export default function AddEntryScreen() {
   const [amount, setAmount] = useState(existing ? String(existing.amount) : ''); 
   const [note, setNote] = useState(existing?.note ?? ''); 
   const [dateStr, setDateStr] = useState(existing?.date ?? new Date().toISOString().slice(0, 10));
-  const [accountId, setAccountId] = useState(existing?.accountId ?? accounts[0]?.id ?? ''); 
+  const [customAccountId, setCustomAccountId] = useState(existing?.accountId ?? ''); 
   const [toAccountId, setToAccountId] = useState(existing?.toAccountId ?? ''); 
-  const [categoryId, setCategoryId] = useState(existing?.categoryId ?? ''); 
-  const [receiptUri, setReceiptUri] = useState<string | null>(existing?.receiptUri ?? null);
+  const [customCategoryId, setCustomCategoryId] = useState(existing?.categoryId ?? ''); 
+  const [persistedReceiptUri, setPersistedReceiptUri] = useState<string | null>(existing?.receiptUri ?? null);
+  const [stagedAsset, setStagedAsset] = useState<StagedReceipt | null>(null);
   const [saving, setSaving] = useState(false);
   
-  const visibleCategories = categories.filter((category) => category.type === (type === 'income' ? 'income' : 'expense')); const destinations = accounts.filter((account) => account.id !== accountId);
-  useEffect(() => { if (!accountId && accounts[0]) setAccountId(accounts[0].id); if (type !== 'transfer' && !visibleCategories.some((category) => category.id === categoryId)) setCategoryId(visibleCategories[0]?.id ?? ''); }, [accountId, accounts, categoryId, type, visibleCategories]);
+  const activeReceiptReference = stagedAsset ? stagedAsset.uri : persistedReceiptUri;
+  const displayReceiptUri = useReceiptDisplayUri(activeReceiptReference);
+  
+  const visibleCategories = categories.filter((category) => category.type === (type === 'income' ? 'income' : 'expense'));
+  const accountId = customAccountId || accounts[0]?.id || '';
+  const destinations = accounts.filter((account) => account.id !== accountId);
+  const categoryId = (type !== 'transfer' && visibleCategories.some((category) => category.id === customCategoryId))
+    ? customCategoryId
+    : (visibleCategories[0]?.id ?? '');
   
   const pickImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
+    const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
       quality: 0.8,
-      base64: true,
     });
     if (!result.canceled && result.assets && result.assets.length > 0) {
       const asset = result.assets[0];
-      if (Platform.OS === 'web' && asset.base64) {
-        setReceiptUri(`data:${asset.mimeType || 'image/jpeg'};base64,${asset.base64}`);
-      } else {
-        setReceiptUri(asset.uri);
+      if (asset.fileSize && asset.fileSize > MAX_RECEIPT_SIZE_BYTES) {
+        Alert.alert('File too large', 'Please choose an image under 15 MB.');
+        return;
       }
+      setStagedAsset({
+        uri: asset.uri,
+        mimeType: asset.mimeType,
+        fileSize: asset.fileSize,
+        base64: asset.base64,
+      });
     }
+  };
+
+  const handleRemoveReceipt = () => {
+    setStagedAsset(null);
+    setPersistedReceiptUri(null);
   };
 
   async function save() { 
     const parsed = Number(amount); 
-    if (!accountId || !Number.isFinite(parsed) || parsed <= 0) { Alert.alert('Check this entry', 'Choose an account and enter a positive amount.'); return; } 
-    if (type === 'transfer' && !toAccountId) { Alert.alert('Choose a destination', 'Select the account receiving this transfer.'); return; } 
+    if (!accountId || !Number.isFinite(parsed) || parsed <= 0 || parsed > 999999999.99) {
+      Alert.alert('Check this entry', 'Choose an account and enter a positive amount under 1,000,000,000.');
+      return;
+    } 
+    if (type === 'transfer' && (!toAccountId || toAccountId === accountId)) {
+      Alert.alert('Choose a destination', 'Select a different destination account receiving this transfer.');
+      return;
+    } 
     if (type !== 'transfer' && !categoryId) { Alert.alert('Choose a category', 'Select a category for this transaction.'); return; } 
     if (!dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) { Alert.alert('Check the date', 'Use the format YYYY-MM-DD'); return; }
     setSaving(true); 
     try { 
-      await saveTransaction({ type, amount: parsed, accountId, toAccountId: type === 'transfer' ? toAccountId : null, categoryId: type === 'transfer' ? null : categoryId, date: dateStr, note, receiptUri }, id); 
+      let finalReceiptUri: string | null = persistedReceiptUri;
+      if (stagedAsset) {
+        finalReceiptUri = await persistReceipt(stagedAsset);
+      }
+      await saveTransaction({ type, amount: parsed, accountId, toAccountId: type === 'transfer' ? toAccountId : null, categoryId: type === 'transfer' ? null : categoryId, date: dateStr, note: note.trim().slice(0, 250), receiptUri: finalReceiptUri }, id); 
       router.back(); 
+    } catch (err: any) {
+      Alert.alert('Error saving transaction', err?.message || 'Failed to save transaction.');
     } finally { setSaving(false); } 
   }
   
@@ -84,7 +119,7 @@ export default function AddEntryScreen() {
             
             <View style={s.tabs}>
               {(['expense', 'income', 'transfer'] as EntryType[]).map((item) => (
-                <Pressable key={item} onPress={() => { setType(item); if (item !== 'transfer' && !categories.find((category) => category.id === categoryId && category.type === item)) setCategoryId(categories.find((category) => category.type === item)?.id ?? ''); }} style={[s.tab, type === item && s.tabActive]}>
+                <Pressable key={item} onPress={() => { setType(item); setCustomCategoryId(''); }} style={[s.tab, type === item && s.tabActive]}>
                   <Text numberOfLines={1} style={[s.tabText, type === item && s.tabTextActive]}>{item}</Text>
                 </Pressable>
               ))}
@@ -93,7 +128,7 @@ export default function AddEntryScreen() {
             <Text style={s.fieldLabel}>Amount</Text>
             <View style={s.amountField}>
               <Text style={s.currency}>{currencySymbol}</Text>
-              <TextInput keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor="#8190A8" value={amount} onChangeText={setAmount} style={s.amountInput} />
+              <TextInput keyboardType="decimal-pad" maxLength={12} placeholder="0.00" placeholderTextColor="#8190A8" value={amount} onChangeText={setAmount} style={s.amountInput} />
             </View>
 
             <Text style={s.fieldLabel}>Date</Text>
@@ -105,7 +140,7 @@ export default function AddEntryScreen() {
                 style: { backgroundColor: colors.surface, borderRadius: 12, padding: 14, color: colors.text, fontSize: 16, border: '1px solid #334155', outline: 'none' }
               })
             ) : (
-              <TextInput value={dateStr} onChangeText={setDateStr} placeholder="YYYY-MM-DD" placeholderTextColor="#8190A8" style={s.note} />
+              <TextInput value={dateStr} onChangeText={setDateStr} maxLength={10} placeholder="YYYY-MM-DD" placeholderTextColor="#8190A8" style={s.note} />
             )}
             
             <Text style={s.fieldLabel}>{type === 'transfer' ? 'From account' : 'Account'}</Text>
@@ -121,7 +156,7 @@ export default function AddEntryScreen() {
                   <Choice
                     key={account.id}
                     active={accountId === account.id}
-                    onPress={() => { setAccountId(account.id); if (toAccountId === account.id) setToAccountId(''); }}
+                    onPress={() => { setCustomAccountId(account.id); if (toAccountId === account.id) setToAccountId(''); }}
                   >
                     <View style={s.choiceContent}>
                       <Ionicons name={accIcon} size={18} color={accountId === account.id ? colors.text : colors.primary} style={{ marginRight: 8 }} />
@@ -166,7 +201,7 @@ export default function AddEntryScreen() {
                     <Choice
                       key={category.id}
                       active={categoryId === category.id}
-                      onPress={() => setCategoryId(category.id)}
+                      onPress={() => setCustomCategoryId(category.id)}
                     >
                       <View style={s.choiceContent}>
                         <CategoryIcon icon={category.icon} color={categoryId === category.id ? colors.text : (category.color ?? colors.primary)} size={18} />
@@ -179,13 +214,13 @@ export default function AddEntryScreen() {
             )}
             
             <Text style={s.fieldLabel}>Note</Text>
-            <TextInput placeholder="e.g., Keells Super Grocery" placeholderTextColor="#8190A8" value={note} onChangeText={setNote} multiline style={s.note} />
+            <TextInput placeholder="e.g., Keells Super Grocery" placeholderTextColor="#8190A8" value={note} onChangeText={setNote} maxLength={250} multiline style={s.note} />
             
             <Text style={s.fieldLabel}>Receipt (Optional)</Text>
-            {receiptUri ? (
+            {displayReceiptUri ? (
               <View style={s.receiptPreviewContainer}>
-                <Image source={{ uri: receiptUri }} style={s.receiptPreview} />
-                <Pressable onPress={() => setReceiptUri(null)} style={s.removeReceiptBtn}>
+                <Image source={{ uri: displayReceiptUri }} style={s.receiptPreview} />
+                <Pressable onPress={handleRemoveReceipt} style={s.removeReceiptBtn}>
                   <Ionicons name="trash-outline" size={14} color="#FFF" style={{ marginRight: 4 }} />
                   <Text style={s.removeReceiptText}>Remove</Text>
                 </Pressable>

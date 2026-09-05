@@ -38,6 +38,7 @@ export default function TransactionSearchScreen() {
           <TextInput 
             autoFocus
             style={s.input}
+            maxLength={100}
             placeholder="Search by note, account or category..."
             placeholderTextColor={colors.muted}
             value={query}
@@ -76,7 +77,7 @@ export default function TransactionSearchScreen() {
         {query.trim().length > 0 && results.length === 0 && (
           <View style={s.emptyBox}>
             <Ionicons name="search-outline" size={36} color={colors.muted} style={{ marginBottom: 10 }} />
-            <Text style={s.empty}>No transactions found for "{query}"</Text>
+            <Text style={s.empty}>No transactions found for &quot;{query}&quot;</Text>
           </View>
         )}
       </ScrollView>

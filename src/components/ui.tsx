@@ -1,5 +1,5 @@
 import { router, useFocusEffect } from 'expo-router';
-import { PropsWithChildren, ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { PropsWithChildren, ReactNode, useCallback, useMemo, useState } from 'react';
 import {
   Animated,
   Image,
@@ -23,6 +23,9 @@ export const colors = {
   primaryDark: '#0F2A5C',
   brandBlue: '#1D4ED8',
   line: '#334155',
+  card: '#162235',
+  cardAlt: '#1B2A42',
+  tint: '#38BDF8',
   income: '#34D399',
   expense: '#F87171',
   amber: '#FBBF24',
@@ -34,8 +37,8 @@ export const formatMoney = (value: number, currency: string = 'USD') => {
 };
 
 export function Screen({ children, style }: PropsWithChildren<{ style?: ViewStyle }>) {
-  const opacity = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(15)).current;
+  const opacity = useMemo(() => new Animated.Value(0), []);
+  const translateY = useMemo(() => new Animated.Value(15), []);
   
   useFocusEffect(
     useCallback(() => {
@@ -58,7 +61,7 @@ export function Screen({ children, style }: PropsWithChildren<{ style?: ViewStyl
 }
 
 export function AnimatedPressable({ children, style, ...props }: PropsWithChildren<PressableProps & { style?: any }>) {
-  const scale = useRef(new Animated.Value(1)).current;
+  const scale = useMemo(() => new Animated.Value(1), []);
 
   const handlePressIn = (e: any) => {
     Animated.spring(scale, { toValue: 0.95, useNativeDriver: true, tension: 150, friction: 5 }).start();
@@ -199,10 +202,14 @@ export function SectionTitle({ children, color }: PropsWithChildren<{ color?: st
 }
 
 export function MonthPicker({ visible, onClose, currentMonth, onSelect }: { visible: boolean; onClose: () => void; currentMonth: string; onSelect: (month: string) => void }) {
-  const [yearStr] = currentMonth.split('-');
-  const [selectedYear, setSelectedYear] = useState(parseInt(yearStr, 10));
-  
-  useEffect(() => { if (visible) setSelectedYear(parseInt(currentMonth.split('-')[0], 10)); }, [currentMonth, visible]);
+  const currentYearInt = parseInt(currentMonth.split('-')[0], 10);
+  const [prevMonth, setPrevMonth] = useState(currentMonth);
+  const [selectedYear, setSelectedYear] = useState(currentYearInt);
+
+  if (prevMonth !== currentMonth) {
+    setPrevMonth(currentMonth);
+    setSelectedYear(currentYearInt);
+  }
   
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   

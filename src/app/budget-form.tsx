@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useMoney } from '@/context/money-context';
@@ -12,20 +12,18 @@ export default function BudgetForm() {
   const { budgets, categories, saveBudget, deleteBudget, currency } = useMoney();
   const existing = budgets.find((budget) => budget.id === id);
   const expenseCategories = categories.filter((category) => category.type === 'expense');
-  const [categoryId, setCategoryId] = useState(existing?.categoryId ?? '');
+  const [selectedCategoryId, setSelectedCategoryId] = useState(existing?.categoryId ?? '');
   const [amount, setAmount] = useState(existing ? String(existing.amount) : '');
 
-  useEffect(() => {
-    if (!categoryId && expenseCategories[0]) setCategoryId(expenseCategories[0].id);
-  }, [categoryId, expenseCategories]);
+  const activeCategoryId = selectedCategoryId || expenseCategories[0]?.id || '';
 
   async function save() {
     const value = Number(amount);
-    if (!categoryId || !Number.isFinite(value) || value <= 0) {
+    if (!activeCategoryId || !Number.isFinite(value) || value <= 0) {
       Alert.alert('Enter a budget', 'Choose a category and a positive monthly amount.');
       return;
     }
-    await saveBudget({ categoryId, amount: value, month: existing?.month ?? currentMonth }, id);
+    await saveBudget({ categoryId: activeCategoryId, amount: value, month: existing?.month ?? currentMonth }, id);
     router.back();
   }
 
@@ -78,16 +76,16 @@ export default function BudgetForm() {
           {expenseCategories.map((category) => (
             <Pressable
               key={category.id}
-              onPress={() => setCategoryId(category.id)}
-              style={[s.choice, categoryId === category.id && s.choiceActive]}
+              onPress={() => setSelectedCategoryId(category.id)}
+              style={[s.choice, activeCategoryId === category.id && s.choiceActive]}
             >
               <View style={s.choiceContent}>
                 <CategoryIcon
                   icon={category.icon}
-                  color={categoryId === category.id ? colors.text : (category.color ?? colors.primary)}
+                  color={activeCategoryId === category.id ? colors.text : (category.color ?? colors.primary)}
                   size={20}
                 />
-                <Text style={[s.choiceText, categoryId === category.id && s.choiceTextActive]}>
+                <Text style={[s.choiceText, activeCategoryId === category.id && s.choiceTextActive]}>
                   {category.name}
                 </Text>
               </View>
@@ -102,6 +100,7 @@ export default function BudgetForm() {
             value={amount}
             onChangeText={setAmount}
             keyboardType="decimal-pad"
+            maxLength={12}
             placeholder="0.00"
             placeholderTextColor="#8190A8"
             style={s.input}
