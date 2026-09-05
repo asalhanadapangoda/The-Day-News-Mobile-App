@@ -67,43 +67,35 @@ jobs:
           node -e '
           const fs = require("fs");
           let gradle = fs.readFileSync("build.gradle", "utf8");
-          if (!gradle.includes("release {")) {
-            const signingBlock = `
+          const signingBlock = `
                   release {
-                      if (project.hasProperty("THEDAYAPP_RELEASE_STORE_FILE")) {
-                          storeFile file(THEDAYAPP_RELEASE_STORE_FILE)
-                          storePassword THEDAYAPP_RELEASE_STORE_PASSWORD
-                          keyAlias THEDAYAPP_RELEASE_KEY_ALIAS
-                          keyPassword THEDAYAPP_RELEASE_KEY_PASSWORD
-                      }
+                      storeFile file(THEDAYAPP_RELEASE_STORE_FILE)
+                      storePassword THEDAYAPP_RELEASE_STORE_PASSWORD
+                      keyAlias THEDAYAPP_RELEASE_KEY_ALIAS
+                      keyPassword THEDAYAPP_RELEASE_KEY_PASSWORD
                   }
-            `;
-            gradle = gradle.replace("signingConfigs {", "signingConfigs {" + signingBlock);
-            gradle = gradle.replace(/buildTypes\s*{\s*release\s*{/, "buildTypes {\n        release {\n            signingConfig signingConfigs.release");
-            fs.writeFileSync("build.gradle", gradle);
-          }
+          `;
+          gradle = gradle.replace("signingConfigs {", "signingConfigs {\n" + signingBlock);
+          gradle = gradle.replace(/buildTypes\s*{\s*release\s*{/, "buildTypes {\n        release {\n            signingConfig signingConfigs.release");
+          fs.writeFileSync("build.gradle", gradle);
           '
 
-      - name: 9. Build Standalone APK (.apk)
+      - name: 9. Build Standalone Release APK (.apk)
         working-directory: android
         run: |
           chmod +x gradlew
-          if [ "$HAS_KEYSTORE" = "true" ]; then
-            echo "Building signed Release APK..."
-            ./gradlew assembleRelease --no-daemon
-          else
-            echo "Building installable Test APK..."
-            ./gradlew assembleDebug --no-daemon
-          fi
+          echo "Building standalone Release APK with embedded JavaScript bundle..."
+          ./gradlew assembleRelease --no-daemon
 
       - name: 10. Secure Cleanup of Keystore
         if: always()
         run: rm -f android/app/release.keystore
 
-      - name: 11. Upload Testable APK (.apk)
+      - name: 11. Upload Standalone APK (.apk)
         uses: actions/upload-artifact@v4
         with:
           name: the-day-app-apk
-          path: android/app/build/outputs/apk/**/*.apk
+          path: android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 14
+

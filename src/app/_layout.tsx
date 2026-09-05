@@ -15,6 +15,10 @@ export default function RootLayout() {
   useEffect(() => {
     // Dismiss native splash screen immediately when React Native mounts
     SplashScreen.hideAsync().catch(() => {});
+    const timer = setTimeout(() => {
+      SplashScreen.hideAsync().catch(() => {});
+    }, 150);
+    return () => clearTimeout(timer);
   }, []);
 
   return (
