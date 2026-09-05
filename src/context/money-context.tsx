@@ -63,24 +63,29 @@ export function MoneyProvider({ children }: PropsWithChildren) {
   const [onboardingCompleted, setOnboardingCompleted] = useState(false);
 
   const refresh = useCallback(async () => {
-    const [a, c, t, b, s] = await Promise.all([
-      db.getAllAsync<Account>('SELECT * FROM accounts ORDER BY name'),
-      db.getAllAsync<Category>('SELECT * FROM categories ORDER BY type, name'),
-      db.getAllAsync<Transaction>('SELECT * FROM transactions ORDER BY date DESC'),
-      db.getAllAsync<Budget>('SELECT * FROM budgets ORDER BY month DESC'),
-      db.getAllAsync<{ key: string; value: string }>('SELECT * FROM settings'),
-    ]);
-    setAccounts(a);
-    setCategories(c);
-    setTransactions(t);
-    setBudgets(b);
-    const cur = s.find((x) => x.key === 'currency')?.value;
-    if (cur) setCurrency(cur);
-    const uname = s.find((x) => x.key === 'username')?.value;
-    if (uname) setUsername(uname);
-    const onb = s.find((x) => x.key === 'onboarding')?.value;
-    if (onb === '1') setOnboardingCompleted(true);
-    setLoading(false);
+    try {
+      const [a, c, t, b, s] = await Promise.all([
+        db.getAllAsync<Account>('SELECT * FROM accounts ORDER BY name').catch(() => []),
+        db.getAllAsync<Category>('SELECT * FROM categories ORDER BY type, name').catch(() => []),
+        db.getAllAsync<Transaction>('SELECT * FROM transactions ORDER BY date DESC').catch(() => []),
+        db.getAllAsync<Budget>('SELECT * FROM budgets ORDER BY month DESC').catch(() => []),
+        db.getAllAsync<{ key: string; value: string }>('SELECT * FROM settings').catch(() => []),
+      ]);
+      setAccounts(a);
+      setCategories(c);
+      setTransactions(t);
+      setBudgets(b);
+      const cur = s.find((x) => x.key === 'currency')?.value;
+      if (cur) setCurrency(cur);
+      const uname = s.find((x) => x.key === 'username')?.value;
+      if (uname) setUsername(uname);
+      const onb = s.find((x) => x.key === 'onboarding')?.value;
+      if (onb === '1') setOnboardingCompleted(true);
+    } catch (e) {
+      console.error('Failed to load initial data:', e);
+    } finally {
+      setLoading(false);
+    }
   }, [db]);
 
   useEffect(() => {

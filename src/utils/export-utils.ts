@@ -2,9 +2,6 @@ import { cacheDirectory, documentDirectory, writeAsStringAsync, deleteAsync, Enc
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
 import { Platform } from 'react-native';
-// @ts-ignore
-import { jsPDF } from 'jspdf/dist/jspdf.es.min.js';
-import autoTable from 'jspdf-autotable';
 import { Transaction, Category, Account } from '@/data/types';
 import { formatMoney } from '@/components/ui';
 
@@ -116,6 +113,12 @@ export async function exportToPDF(
 ) {
   try {
     if (Platform.OS === 'web') {
+      // @ts-ignore
+      const { jsPDF } = await import('jspdf/dist/jspdf.es.min.js');
+      // @ts-ignore
+      const autoTableModule = await import('jspdf-autotable');
+      const autoTable = autoTableModule.default || autoTableModule;
+
       const doc = new jsPDF();
       doc.text("The Day App Report", 14, 15);
       doc.setFontSize(10);

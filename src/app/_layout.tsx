@@ -1,4 +1,4 @@
-import { Stack, router } from 'expo-router';
+import { Stack } from 'expo-router';
 import { SQLiteProvider } from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
@@ -13,11 +13,8 @@ import { LockScreen } from '@/components/security/lock-screen';
 
 export default function RootLayout() {
   useEffect(() => {
-    // Safety fallback: ensure native splash screen is never stuck on Android
-    const timer = setTimeout(() => {
-      SplashScreen.hideAsync().catch(() => {});
-    }, 1500);
-    return () => clearTimeout(timer);
+    // Dismiss native splash screen immediately when React Native mounts
+    SplashScreen.hideAsync().catch(() => {});
   }, []);
 
   return (
@@ -32,9 +29,7 @@ function AppSecurityGate() {
   const { authState, privacyShieldActive } = useSecurity();
 
   useEffect(() => {
-    if (authState !== 'INITIALIZING') {
-      SplashScreen.hideAsync().catch(() => {});
-    }
+    SplashScreen.hideAsync().catch(() => {});
   }, [authState]);
 
   if (authState === 'INITIALIZING') {
@@ -50,7 +45,10 @@ function AppSecurityGate() {
   }
 
   return (
-    <SQLiteProvider databaseName="lumina-finance.db" onInit={migrateDbIfNeeded}>
+    <SQLiteProvider
+      databaseName="lumina-finance.db"
+      onInit={migrateDbIfNeeded}
+    >
       <MoneyProvider>
         <AppNavigator />
         {privacyShieldActive ? <LockScreen /> : null}
@@ -60,18 +58,39 @@ function AppSecurityGate() {
 }
 
 function AppNavigator() { 
-  const { loading, onboardingCompleted } = useMoney(); 
+  const { loading } = useMoney(); 
   
   useEffect(() => {
     if (!loading) {
       SplashScreen.hideAsync().catch(() => {});
-      if (!onboardingCompleted) {
-        router.replace('/welcome');
-      }
     }
-  }, [loading, onboardingCompleted]);
+  }, [loading]);
 
-  if (loading) return <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}><ActivityIndicator size="large" color={colors.primary} /></View>; 
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
   
-  return <Stack screenOptions={{ headerShown: false, animation: 'fade_from_bottom', animationDuration: 180, contentStyle: { backgroundColor: colors.background } }}><Stack.Screen name="(tabs)" /><Stack.Screen name="welcome" options={{ animation: 'fade' }} /><Stack.Screen name="add-entry" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} /><Stack.Screen name="category-form" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} /><Stack.Screen name="account-form" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} /><Stack.Screen name="budget-form" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} /><Stack.Screen name="transaction-search" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} /></Stack>; 
+  return (
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        animation: 'fade_from_bottom',
+        animationDuration: 180,
+        contentStyle: { backgroundColor: colors.background },
+      }}
+    >
+      <Stack.Screen name="index" />
+      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="welcome" options={{ animation: 'fade' }} />
+      <Stack.Screen name="add-entry" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+      <Stack.Screen name="category-form" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+      <Stack.Screen name="account-form" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+      <Stack.Screen name="budget-form" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+      <Stack.Screen name="transaction-search" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+    </Stack>
+  );
 }

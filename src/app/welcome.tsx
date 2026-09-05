@@ -9,6 +9,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -21,7 +22,7 @@ import { AnimatedPressable, colors } from '@/components/ui';
 const OFFICIAL_WEBSITE_URL = 'https://thedaynewsglobal.lk/';
 
 export default function WelcomeScreen() {
-  const { setGlobalCurrency, setGlobalUsername, saveAccount, completeOnboarding, onboardingCompleted } = useMoney();
+  const { setGlobalCurrency, setGlobalUsername, saveAccount, completeOnboarding } = useMoney();
   // Step State
   const [currentStep, setCurrentStep] = useState(0);
 
@@ -57,16 +58,12 @@ export default function WelcomeScreen() {
     }
   };
 
-  const handleStartApp = () => {
-    if (onboardingCompleted) {
-      router.replace('/(tabs)');
-    } else {
-      setCurrentStep(1);
+  const handleStartApp = async () => {
+    try {
+      await completeOnboarding();
+    } catch {
+      // Tolerated
     }
-  };
-
-  const handleSkip = async () => {
-    await completeOnboarding();
     router.replace('/(tabs)');
   };
 
@@ -107,7 +104,11 @@ export default function WelcomeScreen() {
       {/* STEP 0: Landing Welcome Hub with 3 Primary Buttons */}
       {currentStep === 0 && (
         <View style={s.page}>
-          <ScrollView contentContainerStyle={s.landingScrollContent} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            contentContainerStyle={s.landingScrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
             {/* Header / Brand Emblem */}
             <View style={s.brandSection}>
               <View style={s.badgePill}>
@@ -132,7 +133,7 @@ export default function WelcomeScreen() {
             {/* The 3 Action Buttons / Cards */}
             <View style={s.actionCardsContainer}>
               {/* BUTTON 1: Official Website */}
-              <AnimatedPressable onPress={handleOpenWebsite} style={s.secondaryActionCard}>
+              <TouchableOpacity activeOpacity={0.8} onPress={handleOpenWebsite} style={s.secondaryActionCard}>
                 <View style={s.cardIconCircle}>
                   <Ionicons name="globe-outline" size={22} color={colors.primary} />
                 </View>
@@ -143,10 +144,10 @@ export default function WelcomeScreen() {
                   </View>
                   <Text style={s.cardDesc}>Visit thedaynewsglobal.lk for world news & updates</Text>
                 </View>
-              </AnimatedPressable>
+              </TouchableOpacity>
 
               {/* BUTTON 2 (MIDDLE): Start into the App */}
-              <AnimatedPressable onPress={handleStartApp} style={s.primaryHeroCard}>
+              <TouchableOpacity activeOpacity={0.8} onPress={handleStartApp} style={s.primaryHeroCard}>
                 <View style={s.primaryHeroContent}>
                   <View style={s.primaryHeroIconCircle}>
                     <Ionicons name="rocket-outline" size={24} color="#FFFFFF" />
@@ -161,10 +162,10 @@ export default function WelcomeScreen() {
                     </Text>
                   </View>
                 </View>
-              </AnimatedPressable>
+              </TouchableOpacity>
 
               {/* BUTTON 3: FinLift with Sasiru (Coming Soon) */}
-              <AnimatedPressable onPress={() => setShowFinliftModal(true)} style={s.videoSeriesCard}>
+              <TouchableOpacity activeOpacity={0.8} onPress={() => setShowFinliftModal(true)} style={s.videoSeriesCard}>
                 <View style={[s.cardIconCircle, { backgroundColor: '#332917', borderColor: '#5C471F' }]}>
                   <Ionicons name="videocam-outline" size={22} color="#FBBF24" />
                 </View>
@@ -179,16 +180,16 @@ export default function WelcomeScreen() {
                     Financial literacy & wealth mastery video series
                   </Text>
                 </View>
-              </AnimatedPressable>
+              </TouchableOpacity>
             </View>
+
+            {/* Optional Profile Setup Wizard */}
+            <TouchableOpacity activeOpacity={0.7} onPress={() => setCurrentStep(1)} style={s.skipButton}>
+              <Text style={s.skipButtonText}>Customize Profile & Currency Wizard →</Text>
+            </TouchableOpacity>
 
             {/* Footer note */}
             <Text style={s.versionNote}>v1.0.0 • 100% Offline & Private</Text>
-
-            {/* Quick Skip Option */}
-            <Pressable onPress={handleSkip} style={s.skipButton}>
-              <Text style={s.skipButtonText}>Skip setup and start tracking →</Text>
-            </Pressable>
           </ScrollView>
         </View>
       )}
