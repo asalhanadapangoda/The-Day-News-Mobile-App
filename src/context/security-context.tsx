@@ -55,27 +55,43 @@ export function SecurityProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     let isMounted = true;
 
-    async function initSecurity() {
-      const caps = await getBiometricCapabilities();
-      if (!isMounted) return;
-      setBiometricInfo(caps);
-
-      const storedLockEnabled = await getSecureItem(KEY_APP_LOCK_ENABLED);
-      const isEnabled = storedLockEnabled === 'true';
-      if (!isMounted) return;
-      setAppLockEnabledState(isEnabled);
-
-      const storedTimeout = await getSecureItem(KEY_AUTO_LOCK_TIMEOUT);
-      if (storedTimeout && !isNaN(Number(storedTimeout))) {
-        setAutoLockTimeoutState(Number(storedTimeout));
+    const safetyTimeout = setTimeout(() => {
+      if (isMounted) {
+        setAuthState((prev) => (prev === 'INITIALIZING' ? 'UNLOCKED' : prev));
       }
+    }, 600);
 
-      if (isEnabled) {
-        setAuthState('LOCKED');
-        setPrivacyShieldActive(true);
-      } else {
-        setAuthState('UNLOCKED');
-        setPrivacyShieldActive(false);
+    async function initSecurity() {
+      try {
+        const caps = await getBiometricCapabilities();
+        if (!isMounted) return;
+        setBiometricInfo(caps);
+
+        const storedLockEnabled = await getSecureItem(KEY_APP_LOCK_ENABLED);
+        const isEnabled = storedLockEnabled === 'true';
+        if (!isMounted) return;
+        setAppLockEnabledState(isEnabled);
+
+        const storedTimeout = await getSecureItem(KEY_AUTO_LOCK_TIMEOUT);
+        if (storedTimeout && !isNaN(Number(storedTimeout))) {
+          setAutoLockTimeoutState(Number(storedTimeout));
+        }
+
+        if (isEnabled) {
+          setAuthState('LOCKED');
+          setPrivacyShieldActive(true);
+        } else {
+          setAuthState('UNLOCKED');
+          setPrivacyShieldActive(false);
+        }
+      } catch (err) {
+        console.error('Failed to init security:', err);
+        if (isMounted) {
+          setAuthState('UNLOCKED');
+          setPrivacyShieldActive(false);
+        }
+      } finally {
+        clearTimeout(safetyTimeout);
       }
     }
 
@@ -83,6 +99,7 @@ export function SecurityProvider({ children }: PropsWithChildren) {
 
     return () => {
       isMounted = false;
+      clearTimeout(safetyTimeout);
     };
   }, []);
 
