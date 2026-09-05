@@ -1,8 +1,7 @@
 import { router } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import {
   Alert,
-  Dimensions,
   Image,
   Modal,
   Pressable,
@@ -19,12 +18,12 @@ import * as Linking from 'expo-linking';
 import { useMoney } from '@/context/money-context';
 import { AnimatedPressable, colors } from '@/components/ui';
 
-const { width } = Dimensions.get('window');
 const OFFICIAL_WEBSITE_URL = 'https://thedaynewsglobal.lk/';
 
 export default function WelcomeScreen() {
   const { setGlobalCurrency, setGlobalUsername, saveAccount, completeOnboarding, onboardingCompleted } = useMoney();
-  const scrollRef = useRef<ScrollView>(null);
+  // Step State
+  const [currentStep, setCurrentStep] = useState(0);
 
   // Modal State for FinLift video series
   const [showFinliftModal, setShowFinliftModal] = useState(false);
@@ -43,7 +42,7 @@ export default function WelcomeScreen() {
   const [saving, setSaving] = useState(false);
 
   const goToStep = (index: number) => {
-    scrollRef.current?.scrollTo({ x: index * width, animated: true });
+    setCurrentStep(index);
   };
 
   const handleOpenWebsite = async () => {
@@ -62,8 +61,13 @@ export default function WelcomeScreen() {
     if (onboardingCompleted) {
       router.replace('/(tabs)');
     } else {
-      goToStep(1);
+      setCurrentStep(1);
     }
+  };
+
+  const handleSkip = async () => {
+    await completeOnboarding();
+    router.replace('/(tabs)');
   };
 
   const finish = async () => {
@@ -100,22 +104,15 @@ export default function WelcomeScreen() {
 
   return (
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
-      <ScrollView
-        ref={scrollRef}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        scrollEnabled={false}
-        style={s.flex}
-      >
-        {/* STEP 0: Landing Welcome Hub with 3 Primary Buttons */}
+      {/* STEP 0: Landing Welcome Hub with 3 Primary Buttons */}
+      {currentStep === 0 && (
         <View style={s.page}>
           <ScrollView contentContainerStyle={s.landingScrollContent} showsVerticalScrollIndicator={false}>
             {/* Header / Brand Emblem */}
             <View style={s.brandSection}>
               <View style={s.badgePill}>
                 <Ionicons name="newspaper-outline" size={13} color={colors.primary} style={{ marginRight: 5 }} />
-                <Text style={s.badgePillText}>THE DAY NEWS GLOBAL</Text>
+                <Text style={s.badgePillText}>THE DAY APP</Text>
               </View>
 
               {/* Official Logo Frame */}
@@ -126,9 +123,9 @@ export default function WelcomeScreen() {
                 />
               </View>
 
-              <Text style={s.landingTitle}>The Day News</Text>
+              <Text style={s.landingTitle}>The Day App</Text>
               <Text style={s.landingSubtitle}>
-                Global News Insights & Smart Personal Finance Management
+                Smart Personal Finance & Offline Money Tracker
               </Text>
             </View>
 
@@ -187,10 +184,17 @@ export default function WelcomeScreen() {
 
             {/* Footer note */}
             <Text style={s.versionNote}>v1.0.0 • 100% Offline & Private</Text>
+
+            {/* Quick Skip Option */}
+            <Pressable onPress={handleSkip} style={s.skipButton}>
+              <Text style={s.skipButtonText}>Skip setup and start tracking →</Text>
+            </Pressable>
           </ScrollView>
         </View>
+      )}
 
-        {/* STEP 1: Introduction / User Name */}
+      {/* STEP 1: Introduction / User Name */}
+      {currentStep === 1 && (
         <View style={s.page}>
           <View style={s.content}>
             <View style={s.iconWrapper}>
@@ -224,8 +228,10 @@ export default function WelcomeScreen() {
             </AnimatedPressable>
           </View>
         </View>
+      )}
 
-        {/* STEP 2: Choose Currency */}
+      {/* STEP 2: Choose Currency */}
+      {currentStep === 2 && (
         <View style={s.page}>
           <View style={s.content}>
             <View style={s.iconWrapper}>
@@ -284,8 +290,10 @@ export default function WelcomeScreen() {
             </AnimatedPressable>
           </View>
         </View>
+      )}
 
-        {/* STEP 3: First Account Setup */}
+      {/* STEP 3: First Account Setup */}
+      {currentStep === 3 && (
         <View style={s.page}>
           <View style={s.content}>
             <View style={s.iconWrapper}>
@@ -330,7 +338,7 @@ export default function WelcomeScreen() {
             </AnimatedPressable>
           </View>
         </View>
-      </ScrollView>
+      )}
 
       {/* FinLift with Sasiru Preview Modal */}
       <Modal
@@ -397,7 +405,7 @@ export default function WelcomeScreen() {
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
-  page: { width, padding: 24, paddingBottom: 24, justifyContent: 'space-between' },
+  page: { flex: 1, padding: 24, paddingBottom: 24, justifyContent: 'space-between' },
   landingScrollContent: { flexGrow: 1, justifyContent: 'space-between', paddingBottom: 20 },
 
   brandSection: { alignItems: 'center', marginTop: 10, marginBottom: 24 },
@@ -553,6 +561,17 @@ const s = StyleSheet.create({
     fontSize: 12,
     marginTop: 18,
     fontWeight: '600',
+  },
+  skipButton: {
+    alignSelf: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    marginTop: 8,
+  },
+  skipButtonText: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: '700',
   },
 
   // Setup Wizard Steps

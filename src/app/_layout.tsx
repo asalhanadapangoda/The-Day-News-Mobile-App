@@ -1,6 +1,7 @@
 import { Stack, router } from 'expo-router';
 import { SQLiteProvider } from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
+import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { migrateDbIfNeeded } from '@/data/database';
@@ -11,6 +12,14 @@ import { SecurityProvider, useSecurity } from '@/context/security-context';
 import { LockScreen } from '@/components/security/lock-screen';
 
 export default function RootLayout() {
+  useEffect(() => {
+    // Safety fallback: ensure native splash screen is never stuck on Android
+    const timer = setTimeout(() => {
+      SplashScreen.hideAsync().catch(() => {});
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <SecurityProvider>
       <StatusBar style="light" />
@@ -21,6 +30,12 @@ export default function RootLayout() {
 
 function AppSecurityGate() {
   const { authState, privacyShieldActive } = useSecurity();
+
+  useEffect(() => {
+    if (authState !== 'INITIALIZING') {
+      SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [authState]);
 
   if (authState === 'INITIALIZING') {
     return (
@@ -48,8 +63,11 @@ function AppNavigator() {
   const { loading, onboardingCompleted } = useMoney(); 
   
   useEffect(() => {
-    if (!loading && !onboardingCompleted) {
-      router.replace('/welcome');
+    if (!loading) {
+      SplashScreen.hideAsync().catch(() => {});
+      if (!onboardingCompleted) {
+        router.replace('/welcome');
+      }
     }
   }, [loading, onboardingCompleted]);
 
