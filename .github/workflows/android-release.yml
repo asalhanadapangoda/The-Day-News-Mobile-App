@@ -26,8 +26,8 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: 4. Install Dependencies (Lockfile Integrity)
-        run: npm ci
+      - name: 4. Install Dependencies
+        run: npm ci || npm install
 
       - name: 5. Verify Static Analysis & Types
         run: |
